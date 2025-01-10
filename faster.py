@@ -1,5 +1,5 @@
 import camelot
-import fitz  # PyMuPDF
+import fitz 
 import pytesseract
 from PIL import Image
 from bs4 import BeautifulSoup
