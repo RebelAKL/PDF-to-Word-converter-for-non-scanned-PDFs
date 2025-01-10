@@ -1,6 +1,7 @@
 fitz
-layoutparser
+camelot
 pytesseract
 docx
-cv2
 numpy
+BeautifulSoup4
+ultralytics

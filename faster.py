@@ -1,26 +1,20 @@
 import camelot
-import fitz 
+import fitz
 import pytesseract
 from PIL import Image
 from bs4 import BeautifulSoup
 import pypandoc
 import os
 import logging
-import layoutparser
-from layoutparser import Detectron2LayoutModel
+import cv2
 import torch
+from ultralytics import YOLO
 
-layout_model = Detectron2LayoutModel(
-    config_path="lp://PubLayNet/faster_rcnn_R_50_FPN_3x/config",
-    label_map={0: "Text", 1: "Title", 2: "List", 3: "Table", 4: "Figure"},
-    extra_config=["MODEL.DEVICE", "cuda" if torch.cuda.is_available() else "cpu"]
-)
-
+layout_model = YOLO('yolov5s.pt')
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
 
 def extract_tables(pdf_path, output_dir):
     logging.info("Starting table extraction...")
@@ -42,9 +36,7 @@ def extract_tables(pdf_path, output_dir):
 
     return tables
 
-
 def extract_content_with_layout(pdf_path, output_dir, layout_model):
-
     logging.info("Starting content extraction with layout analysis...")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -58,15 +50,17 @@ def extract_content_with_layout(pdf_path, output_dir, layout_model):
             pix.save(img_path)
 
             img = cv2.imread(img_path)
-            layout = layout_model.detect(img)
+            results = layout_model(img)  # Use YOLO to detect layout
             structured_text = ""
 
-            for block in layout:
-                if block['type'] == 'Text':
-                    bbox = block['bbox']
-                    cropped_img = img[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])]
-                    text = pytesseract.image_to_string(cropped_img, lang='rus+eng')
-                    structured_text += f"{text}\n\n"
+            for result in results:
+                for box in result.boxes:
+                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                    label = box.cls[0].cpu().numpy()
+                    if label == 0:  # Assuming label 0 corresponds to 'Text'
+                        cropped_img = img[int(y1):int(y2), int(x1):int(x2)]
+                        text = pytesseract.image_to_string(cropped_img, lang='rus+eng')
+                        structured_text += f"{text}\n\n"
 
             with open(os.path.join(output_dir, f'page_{page_num}_structured.txt'), 'w', encoding='utf-8') as f:
                 f.write(structured_text)
@@ -75,7 +69,6 @@ def extract_content_with_layout(pdf_path, output_dir, layout_model):
             logging.error(f"Failed content extraction on page {page_num}: {e}")
 
 def layout_analysis(pdf_path, output_dir):
-
     logging.info("Starting layout analysis...")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -109,10 +102,7 @@ def add_tables_to_doc(doc, table_bbox, image_path):
             for j, cell in enumerate(row.split("\t")):
                 table.cell(i, j).text = cell
 
-
-
 def generate_html(content_dir, tables_dir, layout_dir, output_html):
-
     logging.info("Generating structured HTML...")
     try:
         html = "<html><head><title>PDF Content</title><style>"
@@ -145,8 +135,6 @@ def generate_html(content_dir, tables_dir, layout_dir, output_html):
     except Exception as e:
         logging.error(f"Failed to generate structured HTML: {e}")
 
-
-
 def html_to_word(html_path, word_path):
     logging.info("Converting HTML to Word...")
     if not os.path.exists(html_path):
@@ -158,9 +146,7 @@ def html_to_word(html_path, word_path):
     except Exception as e:
         logging.error(f"Failed to convert HTML to Word: {e}")
 
-
 def main(pdf_path, output_dir):
-
     try:
         tables_dir = os.path.join(output_dir, 'tables')
         content_dir = os.path.join(output_dir, 'content')
