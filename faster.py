@@ -8,6 +8,7 @@ import os
 import logging
 import layoutparser
 from layoutparser import Detectron2LayoutModel
+import torch
 
 layout_model = Detectron2LayoutModel(
     config_path="lp://PubLayNet/faster_rcnn_R_50_FPN_3x/config",
