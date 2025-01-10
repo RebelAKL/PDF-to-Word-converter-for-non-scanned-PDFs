@@ -9,7 +9,7 @@ import logging
 import layoutparser
 from layoutparser import Detectron2LayoutModel
 
-layout_model = layoutparser.Detectron2LayoutModel(
+layout_model = Detectron2LayoutModel(
     config_path="lp://PubLayNet/faster_rcnn_R_50_FPN_3x/config",
     label_map={0: "Text", 1: "Title", 2: "List", 3: "Table", 4: "Figure"},
     extra_config=["MODEL.DEVICE", "cuda" if torch.cuda.is_available() else "cpu"]
@@ -92,6 +92,22 @@ def layout_analysis(pdf_path, output_dir):
                 f.write(hocr_output)
         except Exception as e:
             logging.error(f"Failed layout analysis for page {page_num}: {e}")
+            
+def add_tables_to_doc(doc, table_bbox, image_path):
+    img = cv2.imread(image_path)
+    contours, _ = cv2.findContours(table_bbox, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    for contour in contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        table_region = img[y:y+h, x:x+w]
+        table_text = pytesseract.image_to_string(table_region, config='--psm 6')
+        rows = table_text.split("\n")
+        table = doc.add_table(rows=len(rows), cols=len(rows[0].split("\t")))
+        table.style = 'Table Grid'
+
+        for i, row in enumerate(rows):
+            for j, cell in enumerate(row.split("\t")):
+                table.cell(i, j).text = cell
+
 
 
 def generate_html(content_dir, tables_dir, layout_dir, output_html):
