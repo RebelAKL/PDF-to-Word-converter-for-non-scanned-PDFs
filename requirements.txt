@@ -1,0 +1,6 @@
+fitz
+layoutparser
+pytesseract
+docx
+cv2
+numpy
